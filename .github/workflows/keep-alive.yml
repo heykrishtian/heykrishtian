@@ -1,0 +1,17 @@
+name: Keep mondera.in alive
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # GitHub's minimum interval
+  workflow_dispatch:
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      # 4 rounds ~70s apart per run keeps gaps well under Render's 5-minute idle limit
+      # even when scheduled runs are delayed.
+      - run: ./scripts/ping.sh https://mondera.in 4 70
