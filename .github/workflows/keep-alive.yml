@@ -1,17 +1,27 @@
 name: Keep mondera.in alive
 on:
   schedule:
-    - cron: "*/5 * * * *"   # GitHub's minimum interval
+    - cron: "*/5 * * * *"   # backup: restarts the chain if it ever breaks
   workflow_dispatch:
+# One run at a time; at most one more waits. A newer queued run replaces an
+# older queued one, so cron runs and chained runs can't pile up.
 concurrency:
   group: keep-alive
   cancel-in-progress: false
+permissions:
+  actions: write   # lets the run dispatch its successor
+  contents: read
 jobs:
   ping:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
-      # 4 rounds ~70s apart per run keeps gaps well under Render's 5-minute idle limit
-      # even when scheduled runs are delayed.
+      # Queue the next run first: it starts as soon as this one ends, so visits
+      # continue even when GitHub delays or skips scheduled runs.
+      - name: Chain next run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run keep-alive.yml --ref "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY"
+      # 4 rounds ~70s apart keeps gaps well under Render's 5-minute idle limit.
       - run: ./scripts/ping.sh https://mondera.in 4 70
